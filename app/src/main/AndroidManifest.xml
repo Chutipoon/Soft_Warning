@@ -31,6 +31,17 @@
             android:exported="false">
         </service>
 
+        <service
+            android:name=".service.WarningOverlayService"
+            android:exported="false">
+        </service>
+
+        <activity
+            android:name=".ui.PermissionRequestActivity"
+            android:exported="false"
+            android:theme="@android:style/Theme.Material.Light.NoActionBar">
+        </activity>
+
         <receiver
             android:name=".receiver.BootReceiver"
             android:exported="true">
