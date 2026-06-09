@@ -12,13 +12,14 @@ import android.os.IBinder
 import android.os.Looper
 import androidx.core.app.NotificationCompat
 import androidx.localbroadcastmanager.content.LocalBroadcastManager
-import com.softwarn.app.data.local.AppSession
-import com.softwarn.app.data.local.AppSessionDao
-import com.softwarn.app.data.local.WarningRuleDao
+import com.softwarn.app.data.AppSession
+import com.softwarn.app.data.AppSessionDao
+import com.softwarn.app.data.WarningRuleDao
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -89,12 +90,14 @@ class UsageMonitorService : Service() {
     }
 
     private fun checkWarning(packageName: String, now: Long) {
+        val capturedSessionStart = sessionStartTime
+        val capturedLastWarning = lastWarningTime
         serviceScope.launch {
             val rule = warningRuleDao.getEnabledRule(packageName) ?: return@launch
-            val durationMs = now - sessionStartTime
+            val durationMs = now - capturedSessionStart
             val intervalMs = rule.intervalMinutes * 60_000L
 
-            if (durationMs >= intervalMs && (now - lastWarningTime) >= intervalMs) {
+            if (durationMs >= intervalMs && (now - capturedLastWarning) >= intervalMs) {
                 fireWarning(packageName, durationMs)
                 lastWarningTime = now
             }
@@ -132,5 +135,6 @@ class UsageMonitorService : Service() {
         super.onDestroy()
         handler.removeCallbacks(pollRunnable)
         saveSession(currentPackage, sessionStartTime, System.currentTimeMillis())
+        serviceScope.cancel()
     }
 }

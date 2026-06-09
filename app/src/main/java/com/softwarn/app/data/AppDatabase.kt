@@ -1,4 +1,4 @@
-package com.softwarn.app.data.local
+package com.softwarn.app.data
 
 import android.content.Context
 import androidx.room.Database

@@ -1,4 +1,4 @@
-package com.softwarn.app.data.local
+package com.softwarn.app.data
 
 import androidx.room.Dao
 import androidx.room.Delete

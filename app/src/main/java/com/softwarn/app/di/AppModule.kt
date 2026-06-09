@@ -1,9 +1,9 @@
 package com.softwarn.app.di
 
 import android.content.Context
-import com.softwarn.app.data.local.AppDatabase
-import com.softwarn.app.data.local.AppSessionDao
-import com.softwarn.app.data.local.WarningRuleDao
+import com.softwarn.app.data.AppDatabase
+import com.softwarn.app.data.AppSessionDao
+import com.softwarn.app.data.WarningRuleDao
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn

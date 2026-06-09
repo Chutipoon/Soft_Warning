@@ -3,10 +3,10 @@ package com.softwarn.app.service
 import android.content.Context
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
-import com.softwarn.app.data.local.AppDatabase
-import com.softwarn.app.data.local.AppSessionDao
-import com.softwarn.app.data.local.WarningRule
-import com.softwarn.app.data.local.WarningRuleDao
+import com.softwarn.app.data.AppDatabase
+import com.softwarn.app.data.AppSessionDao
+import com.softwarn.app.data.WarningRule
+import com.softwarn.app.data.WarningRuleDao
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import org.junit.After
@@ -47,7 +47,7 @@ class UsageMonitorServiceTest {
         val startTime = System.currentTimeMillis() - 10000
         val endTime = System.currentTimeMillis()
 
-        val session = com.softwarn.app.data.local.AppSession(
+        val session = com.softwarn.app.data.AppSession(
             packageName = packageName,
             startTime = startTime,
             endTime = endTime
