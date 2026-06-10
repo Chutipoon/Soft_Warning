@@ -21,6 +21,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
+import java.util.concurrent.atomic.AtomicLong
 import javax.inject.Inject
 
 @AndroidEntryPoint
@@ -35,7 +36,7 @@ class UsageMonitorService : Service() {
 
     @Volatile private var currentPackage: String? = null
     @Volatile private var sessionStartTime: Long = 0
-    @Volatile private var lastWarningTime: Long = 0
+    private val lastWarningTime = AtomicLong(0L)
 
     private val pollRunnable = object : Runnable {
         override fun run() {
@@ -66,7 +67,7 @@ class UsageMonitorService : Service() {
             saveSession(currentPackage, sessionStartTime, now)
             currentPackage = foregroundApp
             sessionStartTime = now
-            lastWarningTime = 0
+            lastWarningTime.set(0L)
         } else if (foregroundApp != null) {
             checkWarning(foregroundApp, now)
         }
@@ -91,7 +92,7 @@ class UsageMonitorService : Service() {
 
     private fun checkWarning(packageName: String, now: Long) {
         val capturedSessionStart = sessionStartTime
-        val capturedLastWarning = lastWarningTime
+        val capturedLastWarning = lastWarningTime.get()
         serviceScope.launch {
             val rule = warningRuleDao.getEnabledRule(packageName) ?: return@launch
             val durationMs = now - capturedSessionStart
@@ -99,7 +100,7 @@ class UsageMonitorService : Service() {
 
             if (durationMs >= intervalMs && (now - capturedLastWarning) >= intervalMs) {
                 fireWarning(packageName, durationMs)
-                lastWarningTime = now
+                lastWarningTime.set(now)
             }
         }
     }

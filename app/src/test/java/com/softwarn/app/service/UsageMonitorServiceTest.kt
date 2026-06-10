@@ -25,10 +25,11 @@ class UsageMonitorServiceTest {
     private lateinit var db: AppDatabase
     private lateinit var appSessionDao: AppSessionDao
     private lateinit var warningRuleDao: WarningRuleDao
+    private lateinit var context: Context
 
     @Before
-    fun createDb() {
-        val context = ApplicationProvider.getApplicationContext<Context>()
+    fun setup() {
+        context = ApplicationProvider.getApplicationContext<Context>()
         db = Room.inMemoryDatabaseBuilder(context, AppDatabase::class.java)
             .allowMainThreadQueries()
             .build()
@@ -37,7 +38,7 @@ class UsageMonitorServiceTest {
     }
 
     @After
-    fun closeDb() {
+    fun tearDown() {
         db.close()
     }
 

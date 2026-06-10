@@ -6,7 +6,9 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.graphics.PixelFormat
+import android.os.Handler
 import android.os.IBinder
+import android.os.Looper
 import android.provider.Settings
 import android.view.Gravity
 import android.view.WindowManager
@@ -102,13 +104,15 @@ class WarningOverlayService : Service(), LifecycleOwner, ViewModelStoreOwner, Sa
     }
 
     private fun removeOverlay() {
-        overlayView?.let {
-            try {
-                windowManager.removeView(it)
-            } catch (e: Exception) {
-                // View might have been already removed or never added
+        Handler(Looper.getMainLooper()).post {
+            overlayView?.let {
+                try {
+                    windowManager.removeView(it)
+                } catch (e: Exception) {
+                    // View might have been already removed or never added
+                }
+                overlayView = null
             }
-            overlayView = null
         }
     }
 
