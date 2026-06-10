@@ -21,6 +21,7 @@ import androidx.savedstate.SavedStateRegistryOwner
 import com.softwarn.app.ui.PermissionRequestActivity
 import com.softwarn.app.ui.WarningBoxContent
 import com.softwarn.app.data.WarningRuleDao
+import com.softwarn.app.util.SoundManager
 import com.softwarn.app.ui.theme.SoftWarningTheme
 import com.softwarn.app.util.MicrocopyProvider
 import dagger.hilt.android.AndroidEntryPoint
@@ -38,6 +39,7 @@ import androidx.savedstate.setViewTreeSavedStateRegistryOwner
 class WarningOverlayService : Service(), LifecycleOwner, ViewModelStoreOwner, SavedStateRegistryOwner {
 
     @Inject lateinit var warningRuleDao: WarningRuleDao
+    @Inject lateinit var soundManager: SoundManager
 
     private lateinit var windowManager: WindowManager
     private var overlayView: ComposeView? = null
@@ -114,6 +116,11 @@ class WarningOverlayService : Service(), LifecycleOwner, ViewModelStoreOwner, Sa
         windowManager.addView(view, params)
         overlayView = view
         lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_RESUME)
+
+        serviceScope.launch {
+            val rule = warningRuleDao.getEnabledRule(packageName) ?: return@launch
+            soundManager.play(rule.soundResId)
+        }
     }
 
     private fun snooze(packageName: String) {
