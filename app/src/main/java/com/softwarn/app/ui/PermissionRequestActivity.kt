@@ -56,14 +56,14 @@ fun PermissionRequestContent(onGoToSettings: () -> Unit) {
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Text(
-            text = "อนุญาตแสดงคำเตือน",
+            text = "Allow Warning Display",
             fontSize = 24.sp,
             fontWeight = FontWeight.Bold,
             textAlign = TextAlign.Center
         )
         Spacer(modifier = Modifier.height(16.dp))
         Text(
-            text = "Soft Warning ต้องการสิทธิ์แสดงหน้าต่างทับแอปอื่น เพื่อแจ้งเตือนเมื่อคุณใช้งานนานเกินไป",
+            text = "Soft Warning needs permission to display windows over other apps to notify you when you've been using them too long.",
             fontSize = 16.sp,
             textAlign = TextAlign.Center
         )
@@ -72,7 +72,7 @@ fun PermissionRequestContent(onGoToSettings: () -> Unit) {
             onClick = onGoToSettings,
             modifier = Modifier.fillMaxWidth().height(56.dp)
         ) {
-            Text("ไปที่การตั้งค่า")
+            Text("Go to Settings")
         }
     }
 }

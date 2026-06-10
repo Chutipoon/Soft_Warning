@@ -20,8 +20,16 @@ import androidx.savedstate.SavedStateRegistryController
 import androidx.savedstate.SavedStateRegistryOwner
 import com.softwarn.app.ui.PermissionRequestActivity
 import com.softwarn.app.ui.WarningBoxContent
+import com.softwarn.app.data.WarningRuleDao
 import com.softwarn.app.ui.theme.SoftWarningTheme
+import com.softwarn.app.util.MicrocopyProvider
 import dagger.hilt.android.AndroidEntryPoint
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.launch
+import javax.inject.Inject
 import androidx.lifecycle.setViewTreeLifecycleOwner
 import androidx.lifecycle.setViewTreeViewModelStoreOwner
 import androidx.savedstate.setViewTreeSavedStateRegistryOwner
@@ -29,9 +37,12 @@ import androidx.savedstate.setViewTreeSavedStateRegistryOwner
 @AndroidEntryPoint
 class WarningOverlayService : Service(), LifecycleOwner, ViewModelStoreOwner, SavedStateRegistryOwner {
 
+    @Inject lateinit var warningRuleDao: WarningRuleDao
+
     private lateinit var windowManager: WindowManager
     private var overlayView: ComposeView? = null
 
+    private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val lifecycleRegistry = LifecycleRegistry(this)
     private val store = ViewModelStore()
     private val savedStateRegistryController = SavedStateRegistryController.create(this)
@@ -80,13 +91,15 @@ class WarningOverlayService : Service(), LifecycleOwner, ViewModelStoreOwner, Sa
         if (overlayView != null) return
 
         val params = buildLayoutParams()
+        val message = MicrocopyProvider.random()
         val view = ComposeView(this).apply {
             setContent {
                 SoftWarningTheme {
                     WarningBoxContent(
                         packageName = packageName,
+                        message = message,
                         onDismiss = { /* AnimatedVisibility will trigger onAnimationFinished */ },
-                        onSnooze = { /* AnimatedVisibility will trigger onAnimationFinished */ },
+                        onSnooze = { snooze(packageName) },
                         onAnimationFinished = { removeOverlay() }
                     )
                 }
@@ -101,6 +114,13 @@ class WarningOverlayService : Service(), LifecycleOwner, ViewModelStoreOwner, Sa
         windowManager.addView(view, params)
         overlayView = view
         lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_RESUME)
+    }
+
+    private fun snooze(packageName: String) {
+        serviceScope.launch {
+            val rule = warningRuleDao.getEnabledRule(packageName) ?: return@launch
+            warningRuleDao.upsert(rule.copy(intervalMinutes = rule.intervalMinutes + 5))
+        }
     }
 
     private fun removeOverlay() {
@@ -132,6 +152,7 @@ class WarningOverlayService : Service(), LifecycleOwner, ViewModelStoreOwner, Sa
     override fun onDestroy() {
         super.onDestroy()
         removeOverlay()
+        serviceScope.cancel()
         LocalBroadcastManager.getInstance(this).unregisterReceiver(warningReceiver)
         lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_DESTROY)
         store.clear()

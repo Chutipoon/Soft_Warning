@@ -23,12 +23,12 @@ import com.softwarn.app.util.MicrocopyProvider
 @Composable
 fun WarningBoxContent(
     packageName: String,
+    message: String,
     onDismiss: () -> Unit,
     onSnooze: () -> Unit,
     onAnimationFinished: () -> Unit
 ) {
     var isVisible by remember { mutableStateOf(false) }
-    val message = remember { MicrocopyProvider.random() }
 
     LaunchedEffect(Unit) {
         isVisible = true
@@ -96,7 +96,7 @@ fun WarningBoxContent(
                     shape = RoundedCornerShape(12.dp),
                     border = ButtonDefaults.outlinedButtonBorder(enabled = true).copy(brush = androidx.compose.ui.graphics.SolidColor(Color.White))
                 ) {
-                    Text("ปิด", color = Color.White)
+                    Text("Close", color = Color.White)
                 }
 
                 Button(
@@ -110,7 +110,7 @@ fun WarningBoxContent(
                     shape = RoundedCornerShape(12.dp),
                     colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF7F77DD))
                 ) {
-                    Text("+5 นาที", color = Color.White)
+                    Text("+5 min", color = Color.White)
                 }
             }
         }
