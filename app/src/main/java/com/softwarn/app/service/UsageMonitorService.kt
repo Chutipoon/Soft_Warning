@@ -15,6 +15,7 @@ import androidx.localbroadcastmanager.content.LocalBroadcastManager
 import com.softwarn.app.data.AppSession
 import com.softwarn.app.data.AppSessionDao
 import com.softwarn.app.data.WarningRuleDao
+import com.softwarn.app.util.SoundManager
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -29,6 +30,7 @@ class UsageMonitorService : Service() {
 
     @Inject lateinit var appSessionDao: AppSessionDao
     @Inject lateinit var warningRuleDao: WarningRuleDao
+    @Inject lateinit var soundManager: SoundManager
 
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val handler = Handler(Looper.getMainLooper())
@@ -136,6 +138,7 @@ class UsageMonitorService : Service() {
         super.onDestroy()
         handler.removeCallbacks(pollRunnable)
         saveSession(currentPackage, sessionStartTime, System.currentTimeMillis())
+        soundManager.release()
         serviceScope.cancel()
     }
 }
