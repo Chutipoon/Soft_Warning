@@ -14,8 +14,13 @@ import android.os.Looper
 import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.localbroadcastmanager.content.LocalBroadcastManager
+import androidx.work.ExistingPeriodicWorkPolicy
+import androidx.work.PeriodicWorkRequestBuilder
+import androidx.work.WorkManager
 import com.softwarn.app.data.AppSession
 import com.softwarn.app.data.AppSessionDao
+import com.softwarn.app.data.WarningEvent
+import com.softwarn.app.data.WarningEventDao
 import com.softwarn.app.data.WarningRuleDao
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CoroutineScope
@@ -23,6 +28,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
+import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicLong
 import javax.inject.Inject
 
@@ -31,6 +37,7 @@ class UsageMonitorService : Service() {
 
     @Inject lateinit var appSessionDao: AppSessionDao
     @Inject lateinit var warningRuleDao: WarningRuleDao
+    @Inject lateinit var warningEventDao: WarningEventDao
 
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val handler = Handler(Looper.getMainLooper())
@@ -51,6 +58,27 @@ class UsageMonitorService : Service() {
         super.onCreate()
         createNotificationChannel()
         startForeground(1, createNotification())
+        isRunning = true
+        scheduleWatchdog()
+    }
+
+    // Runs every 15min (WorkManager's periodic-work floor) and, since it's backed by
+    // WorkManager's own persistent DB, survives this service's process being killed
+    // outright. KEEP means re-arming here on every service (re)creation doesn't reset
+    // an already-running schedule. There's no "stop monitoring" action yet (Phase 4) —
+    // when one exists, it must also call WorkManager.getInstance(context)
+    // .cancelUniqueWork(WATCHDOG_WORK_NAME), or the watchdog will keep reviving a
+    // service the user deliberately stopped.
+    private fun scheduleWatchdog() {
+        val request = PeriodicWorkRequestBuilder<UsageMonitorWatchdogWorker>(
+            WATCHDOG_INTERVAL_MINUTES, TimeUnit.MINUTES
+        ).build()
+        WorkManager.getInstance(applicationContext).enqueueUniquePeriodicWork(
+            WATCHDOG_WORK_NAME,
+            ExistingPeriodicWorkPolicy.KEEP,
+            request
+        )
+        Log.d(TAG, "scheduleWatchdog: enqueued periodic watchdog every ${WATCHDOG_INTERVAL_MINUTES}min")
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -117,14 +145,24 @@ class UsageMonitorService : Service() {
             Log.d(TAG, "checkWarning: $packageName durationMs=$durationMs intervalMs=$intervalMs")
 
             if (durationMs >= intervalMs && (now - capturedLastWarning) >= intervalMs) {
-                fireWarning(packageName, durationMs)
+                fireWarning(packageName, rule.appName, durationMs)
                 lastWarningTime.set(now)
             }
         }
     }
 
-    private fun fireWarning(packageName: String, duration: Long) {
+    private fun fireWarning(packageName: String, appName: String, duration: Long) {
         Log.d(TAG, "fireWarning: $packageName duration=$duration")
+        serviceScope.launch {
+            warningEventDao.insert(
+                WarningEvent(
+                    packageName = packageName,
+                    appName = appName,
+                    firedAt = System.currentTimeMillis(),
+                    sessionDurationMs = duration
+                )
+            )
+        }
         val intent = Intent("com.softwarn.ACTION_WARNING").apply {
             putExtra("package_name", packageName)
             putExtra("session_duration_ms", duration)
@@ -153,6 +191,7 @@ class UsageMonitorService : Service() {
 
     override fun onDestroy() {
         Log.d(TAG, "onDestroy")
+        isRunning = false
         super.onDestroy()
         handler.removeCallbacks(pollRunnable)
         saveSession(currentPackage, sessionStartTime, System.currentTimeMillis())
@@ -162,5 +201,9 @@ class UsageMonitorService : Service() {
     companion object {
         private const val TAG = "SoftWarnMonitor"
         private const val LOOKBACK_MS = 10 * 60_000L
+        private const val WATCHDOG_WORK_NAME = "usage_monitor_watchdog"
+        private const val WATCHDOG_INTERVAL_MINUTES = 15L
+
+        @Volatile var isRunning: Boolean = false
     }
 }

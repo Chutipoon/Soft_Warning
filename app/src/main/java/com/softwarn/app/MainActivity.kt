@@ -1,19 +1,21 @@
 package com.softwarn.app
 
-import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.compose.foundation.layout.*
-import androidx.compose.material3.Button
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
-import androidx.compose.ui.Alignment
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
-import androidx.localbroadcastmanager.content.LocalBroadcastManager
-import com.softwarn.app.service.WarningOverlayService
+import androidx.compose.ui.platform.LocalContext
+import com.softwarn.app.ui.nav.SoftWarningNavHost
+import com.softwarn.app.ui.screen.PermissionOnboardingScreen
 import com.softwarn.app.ui.theme.SoftWarningTheme
+import com.softwarn.app.util.PermissionChecker
 import dagger.hilt.android.AndroidEntryPoint
 
 @AndroidEntryPoint
@@ -22,26 +24,17 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         setContent {
             SoftWarningTheme {
-                Surface {
-                    Column(
-                        modifier = Modifier.fillMaxSize(),
-                        verticalArrangement = Arrangement.Center,
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        Text(text = "Hello Soft Warning!")
-                        Spacer(modifier = Modifier.height(16.dp))
-                        Button(onClick = {
-                            // 1. Start the service
-                            startService(Intent(this@MainActivity, WarningOverlayService::class.java))
-
-                            // 2. Fire a test broadcast
-                            val intent = Intent("com.softwarn.ACTION_WARNING").apply {
-                                putExtra("package_name", "com.android.chrome")
-                            }
-                            LocalBroadcastManager.getInstance(this@MainActivity).sendBroadcast(intent)
-                        }) {
-                            Text("Test Overlay")
-                        }
+                Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+                    val context = LocalContext.current
+                    var showOnboarding by remember {
+                        mutableStateOf(
+                            !PermissionChecker.hasUsageAccess(context) || !PermissionChecker.hasOverlayPermission(context)
+                        )
+                    }
+                    if (showOnboarding) {
+                        PermissionOnboardingScreen(onContinue = { showOnboarding = false })
+                    } else {
+                        SoftWarningNavHost()
                     }
                 }
             }

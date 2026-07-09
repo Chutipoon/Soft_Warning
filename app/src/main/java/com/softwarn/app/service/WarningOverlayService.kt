@@ -57,6 +57,7 @@ class WarningOverlayService : Service(), LifecycleOwner, ViewModelStoreOwner, Sa
         windowManager = getSystemService(WINDOW_SERVICE) as WindowManager
         savedStateRegistryController.performRestore(null)
         lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_CREATE)
+        isRunning = true
 
         LocalBroadcastManager.getInstance(this).registerReceiver(
             warningReceiver,
@@ -143,6 +144,7 @@ class WarningOverlayService : Service(), LifecycleOwner, ViewModelStoreOwner, Sa
 
     override fun onDestroy() {
         Log.d(TAG, "onDestroy")
+        isRunning = false
         super.onDestroy()
         removeOverlay()
         LocalBroadcastManager.getInstance(this).unregisterReceiver(warningReceiver)
@@ -152,5 +154,7 @@ class WarningOverlayService : Service(), LifecycleOwner, ViewModelStoreOwner, Sa
 
     companion object {
         private const val TAG = "SoftWarnOverlay"
+
+        @Volatile var isRunning: Boolean = false
     }
 }
