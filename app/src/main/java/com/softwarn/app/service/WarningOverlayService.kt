@@ -10,6 +10,7 @@ import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
 import android.provider.Settings
+import android.util.Log
 import android.view.Gravity
 import android.view.WindowManager
 import androidx.compose.ui.platform.ComposeView
@@ -42,6 +43,7 @@ class WarningOverlayService : Service(), LifecycleOwner, ViewModelStoreOwner, Sa
 
     private val warningReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
+            Log.d(TAG, "warningReceiver.onReceive: action=${intent?.action}")
             if (intent?.action == "com.softwarn.ACTION_WARNING") {
                 val packageName = intent.getStringExtra("package_name") ?: return
                 showOverlay(packageName)
@@ -51,6 +53,7 @@ class WarningOverlayService : Service(), LifecycleOwner, ViewModelStoreOwner, Sa
 
     override fun onCreate() {
         super.onCreate()
+        Log.d(TAG, "onCreate: registering warningReceiver")
         windowManager = getSystemService(WINDOW_SERVICE) as WindowManager
         savedStateRegistryController.performRestore(null)
         lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_CREATE)
@@ -69,6 +72,7 @@ class WarningOverlayService : Service(), LifecycleOwner, ViewModelStoreOwner, Sa
     override fun onBind(intent: Intent?): IBinder? = null
 
     private fun showOverlay(packageName: String) {
+        Log.d(TAG, "showOverlay: packageName=$packageName canDrawOverlays=${Settings.canDrawOverlays(this)}")
         if (!Settings.canDrawOverlays(this)) {
             val intent = Intent(this, PermissionRequestActivity::class.java).apply {
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
@@ -77,7 +81,10 @@ class WarningOverlayService : Service(), LifecycleOwner, ViewModelStoreOwner, Sa
             return
         }
 
-        if (overlayView != null) return
+        if (overlayView != null) {
+            Log.d(TAG, "showOverlay: overlayView already present, skipping")
+            return
+        }
 
         val params = buildLayoutParams()
         val view = ComposeView(this).apply {
@@ -98,9 +105,14 @@ class WarningOverlayService : Service(), LifecycleOwner, ViewModelStoreOwner, Sa
         view.setViewTreeViewModelStoreOwner(this)
         view.setViewTreeSavedStateRegistryOwner(this)
 
-        windowManager.addView(view, params)
-        overlayView = view
-        lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_RESUME)
+        try {
+            windowManager.addView(view, params)
+            overlayView = view
+            lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_RESUME)
+            Log.d(TAG, "showOverlay: addView succeeded")
+        } catch (e: Exception) {
+            Log.e(TAG, "showOverlay: addView failed", e)
+        }
     }
 
     private fun removeOverlay() {
@@ -130,10 +142,15 @@ class WarningOverlayService : Service(), LifecycleOwner, ViewModelStoreOwner, Sa
     }
 
     override fun onDestroy() {
+        Log.d(TAG, "onDestroy")
         super.onDestroy()
         removeOverlay()
         LocalBroadcastManager.getInstance(this).unregisterReceiver(warningReceiver)
         lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_DESTROY)
         store.clear()
+    }
+
+    companion object {
+        private const val TAG = "SoftWarnOverlay"
     }
 }

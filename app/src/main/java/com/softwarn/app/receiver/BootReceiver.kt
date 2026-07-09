@@ -4,12 +4,13 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import com.softwarn.app.service.UsageMonitorService
+import com.softwarn.app.service.WarningOverlayService
 
 class BootReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         if (intent.action == Intent.ACTION_BOOT_COMPLETED) {
-            val serviceIntent = Intent(context, UsageMonitorService::class.java)
-            context.startForegroundService(serviceIntent)
+            context.startForegroundService(Intent(context, UsageMonitorService::class.java))
+            context.startService(Intent(context, WarningOverlayService::class.java))
         }
     }
 }

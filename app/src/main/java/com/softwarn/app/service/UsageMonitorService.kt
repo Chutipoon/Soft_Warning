@@ -3,6 +3,7 @@ package com.softwarn.app.service
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.Service
+import android.app.usage.UsageEvents
 import android.app.usage.UsageStatsManager
 import android.content.Context
 import android.content.Intent
@@ -10,6 +11,7 @@ import android.os.Build
 import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
+import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.localbroadcastmanager.content.LocalBroadcastManager
 import com.softwarn.app.data.AppSession
@@ -62,6 +64,7 @@ class UsageMonitorService : Service() {
     private fun checkForegroundApp() {
         val now = System.currentTimeMillis()
         val foregroundApp = getCurrentForegroundApp()
+        Log.d(TAG, "poll tick: foregroundApp=$foregroundApp currentPackage=$currentPackage")
 
         if (foregroundApp != currentPackage) {
             saveSession(currentPackage, sessionStartTime, now)
@@ -76,8 +79,18 @@ class UsageMonitorService : Service() {
     private fun getCurrentForegroundApp(): String? {
         val usm = getSystemService(USAGE_STATS_SERVICE) as UsageStatsManager
         val now = System.currentTimeMillis()
-        val stats = usm.queryUsageStats(UsageStatsManager.INTERVAL_DAILY, now - 5000, now)
-        return stats?.maxByOrNull { it.lastTimeUsed }?.packageName
+        val events = usm.queryEvents(now - LOOKBACK_MS, now)
+        var lastForeground: String? = null
+        val event = UsageEvents.Event()
+        while (events.hasNextEvent()) {
+            events.getNextEvent(event)
+            when (event.eventType) {
+                UsageEvents.Event.ACTIVITY_RESUMED -> lastForeground = event.packageName
+                UsageEvents.Event.ACTIVITY_PAUSED, UsageEvents.Event.ACTIVITY_STOPPED ->
+                    if (event.packageName == lastForeground) lastForeground = null
+            }
+        }
+        return lastForeground
     }
 
     private fun saveSession(packageName: String?, startTime: Long, endTime: Long) {
@@ -94,9 +107,14 @@ class UsageMonitorService : Service() {
         val capturedSessionStart = sessionStartTime
         val capturedLastWarning = lastWarningTime.get()
         serviceScope.launch {
-            val rule = warningRuleDao.getEnabledRule(packageName) ?: return@launch
+            val rule = warningRuleDao.getEnabledRule(packageName)
+            if (rule == null) {
+                Log.d(TAG, "checkWarning: no enabled rule for $packageName")
+                return@launch
+            }
             val durationMs = now - capturedSessionStart
             val intervalMs = rule.intervalMinutes * 60_000L
+            Log.d(TAG, "checkWarning: $packageName durationMs=$durationMs intervalMs=$intervalMs")
 
             if (durationMs >= intervalMs && (now - capturedLastWarning) >= intervalMs) {
                 fireWarning(packageName, durationMs)
@@ -106,6 +124,7 @@ class UsageMonitorService : Service() {
     }
 
     private fun fireWarning(packageName: String, duration: Long) {
+        Log.d(TAG, "fireWarning: $packageName duration=$duration")
         val intent = Intent("com.softwarn.ACTION_WARNING").apply {
             putExtra("package_name", packageName)
             putExtra("session_duration_ms", duration)
@@ -133,9 +152,15 @@ class UsageMonitorService : Service() {
         .build()
 
     override fun onDestroy() {
+        Log.d(TAG, "onDestroy")
         super.onDestroy()
         handler.removeCallbacks(pollRunnable)
         saveSession(currentPackage, sessionStartTime, System.currentTimeMillis())
         serviceScope.cancel()
+    }
+
+    companion object {
+        private const val TAG = "SoftWarnMonitor"
+        private const val LOOKBACK_MS = 10 * 60_000L
     }
 }
